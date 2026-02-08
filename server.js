@@ -1,7 +1,7 @@
-// server.js
 const express = require("express");
-const app = express();
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 
+const app = express();
 app.use(express.json());
 
 // صفحة اختبار
@@ -9,8 +9,7 @@ app.get("/", (req, res) => {
   res.send("Webhook running ✅");
 });
 
-
-// ✅ تحقق Webhook من Meta
+// ✅ تحقق Meta من Webhook
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -23,7 +22,6 @@ app.get("/webhook", (req, res) => {
 
   return res.sendStatus(403);
 });
-
 
 // ✅ استقبال الرسائل والرد عليها
 app.post("/webhook", async (req, res) => {
@@ -72,7 +70,6 @@ app.post("/webhook", async (req, res) => {
 
   res.sendStatus(200);
 });
-
 
 // تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
