@@ -1,5 +1,5 @@
 const express = require("express");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 app.use(express.json());
@@ -12,28 +12,38 @@ app.get("/webhook", (req, res) => {
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
+  console.log("VERIFY HIT:", { mode, tokenOk: token === process.env.VERIFY_TOKEN });
+
   if (mode === "subscribe" && token === process.env.VERIFY_TOKEN) {
+    console.log("Webhook verified ✅");
     return res.status(200).send(challenge);
   }
   return res.sendStatus(403);
 });
 
 app.post("/webhook", async (req, res) => {
+  // رجّع 200 بسرعة عشان ميتا ما تعيد الإرسال
+  res.sendStatus(200);
+
   try {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
+    console.log("INCOMING BODY:", JSON.stringify(req.body, null, 2));
+
+    const value = req.body?.entry?.[0]?.changes?.[0]?.value;
     const message = value?.messages?.[0];
 
-    if (!message) return res.sendStatus(200);
+    if (!message) {
+      console.log("No message (maybe status update).");
+      return;
+    }
 
     const from = message.from;
-    const userText = message.text?.body || "";
-    const replyText = userText ? `✅ استلمت: ${userText}` : "✅ وصلت الرسالة";
+    const userText = message?.text?.body || "";
+    console.log("FROM:", from, "TEXT:", userText);
 
+    const replyText = userText ? `✅ استلمت: ${userText}` : "✅ وصلت الرسالة";
     const url = `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`;
 
-    await fetch(url, {
+    const resp = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
@@ -45,9 +55,14 @@ app.post("/webhook", async (req, res) => {
         text: { body: replyText },
       }),
     });
-  } catch (e) {}
-  res.sendStatus(200);
+
+    const txt = await resp.text();
+    console.log("SEND RESP STATUS:", resp.status);
+    console.log("SEND RESP BODY:", txt);
+  } catch (e) {
+    console.error("WEBHOOK ERROR:", e?.message || e);
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {});
+app.listen(PORT, () => console.log("Server running on port", PORT));
